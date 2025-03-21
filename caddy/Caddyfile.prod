@@ -1,0 +1,109 @@
+# Production Caddyfile
+
+(cors) {
+  @cors_preflight{args[0]} {
+    method OPTIONS
+    header Origin {args[0]}
+  }
+  @cors{args[0]} header Origin {args[0]}
+
+  handle @cors_preflight{args[0]} {
+    header {
+      Access-Control-Allow-Origin "{args[0]}"
+      Access-Control-Allow-Credentials true
+      Access-Control-Allow-Headers "Authorization, Cache-Control, Content-Type"
+      Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE"
+      Access-Control-Max-Age "3600"
+      Vary Origin
+      defer
+    }
+    respond "" 204
+  }
+
+  handle @cors{args[0]} {
+    header {
+      Access-Control-Allow-Origin "{args[0]}"
+      Access-Control-Allow-Credentials true
+      Access-Control-Expose-Headers "Retry-After"
+      Vary Origin
+      defer
+    }
+  }
+}
+
+(ban_ips) {
+  @banned_ips {
+    header CF-Connecting-IP 255.255.255.255
+  }
+   redir @banned_ips https://wigger.one/ban/ 
+}
+
+{$DOMAIN_NAME:domain.invalid} {
+    reverse_proxy frontend:80 
+    
+    header {
+        -Server
+        -X-Powered-By
+        Strict-Transport-Security "max-age=31536000;"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+}
+
+www.{$DOMAIN_NAME:domain.invalid} {
+    redir https://{$DOMAIN_NAME}{uri} permanent
+}
+
+api.{$DOMAIN_NAME:domain.invalid} {
+    reverse_proxy backend:8000
+
+    header {
+        -X-Powered-By
+        -Server
+
+        # enable HSTS
+        Strict-Transport-Security max-age=31536000;
+
+        # disable clients from sniffing the media type
+        X-Content-Type-Options nosniff
+
+        # clickjacking protection
+        X-Frame-Options DENY
+
+        # XSS Protection
+        X-XSS-Protection "1; mode=block"
+    }
+
+    @list_items {
+      method GET
+      path /items
+      # header Content-Type application/json
+    }
+
+    handle @list_items {
+        rate_limit {
+            zone list_items_burst {
+                # Uncomment if using cloudflare
+                # key {http.request.header.CF-Connecting-IP}
+                key {remote_host}
+                events 5
+                window 1m
+            }
+
+            log_key
+        }
+        # reverse_proxy backend:8000 # don't need this line since it's already defined above
+    }
+
+    handle_errors {
+        @rate_limited {
+            expression {http.error.status_code} == 429
+        }
+        handle @rate_limited { 
+            # https://caddy.community/t/how-can-i-allow-multiple-domain-origins-in-cors/22129
+            import cors {http.request.header.Origin} 
+        }
+    }
+
+}

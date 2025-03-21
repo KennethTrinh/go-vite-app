@@ -1,0 +1,103 @@
+name: prod
+
+services:
+  backend:
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: production
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    entrypoint: /bin/sh -c "sleep 3 && /app/go-vite-app"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://backend:8000/health"]
+      interval: 120s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dev-network
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      target: production
+      args:
+        VITE_API_URL: https://api.${DOMAIN_NAME}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    depends_on:
+      - backend
+    networks:
+      - dev-network
+
+  caddy:
+    container_name: caddy
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.caddy
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME}
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://api.${DOMAIN_NAME}/health", # use the backend endpoint
+        ]
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - dev-network
+
+volumes:
+  # postgres-data: # debug local
+  # minio-data: # debug local
+  # rabbitmq-data: # debug local
+  # rabbitmq-log: # debug local
+  caddy-data:
+  caddy-config:
+
+networks:
+  dev-network:
+    driver: bridge

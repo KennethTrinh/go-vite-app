@@ -1,0 +1,49 @@
+ARG GO_VERSION=1.24.1
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine as build
+
+WORKDIR /app
+
+COPY backend/ .
+
+RUN apk add --no-cache git gcc musl-dev
+
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    --mount=type=bind,source=backend/go.sum,target=go.sum \
+    --mount=type=bind,source=backend/go.mod,target=go.mod \
+    go mod download -x
+
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    go build -race -o /app/go-vite-app .
+
+
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine as development
+
+WORKDIR /app
+
+COPY backend/ .
+
+RUN apk add --no-cache git gcc musl-dev
+
+RUN go install github.com/air-verse/air@v1.61.7
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
+
+FROM --platform=$BUILDPLATFORM alpine:latest as production
+
+WORKDIR /app
+
+COPY --from=build /app/go-vite-app /app/go-vite-app
+
+RUN apk add --no-cache git gcc musl-dev
+
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    appuser
+RUN chown 10001:10001 -R /app
+USER appuser
