@@ -12,6 +12,16 @@ ARG VITE_API_URL
 
 RUN VITE_API_URL=${VITE_API_URL} bun --verbose run build
 
+FROM caddy:2-builder AS caddy-builder
+COPY caddy/metatags /usr/src/metatags
+RUN xcaddy build \
+    --with github.com/KennethTrinh/caddy-metatags=/usr/src/metatags
+RUN OUTPUT=$(/usr/bin/caddy list-modules | grep metatags) && \
+    echo "Module registered: $OUTPUT" && \
+    [ "$OUTPUT" = "http.handlers.metatags" ] || \
+    (echo "ERROR: Module not registered correctly" && exit 1)
+
 FROM caddy:2-alpine as production
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY caddy/Caddyfile.frontend.prod /etc/caddy/Caddyfile
 COPY --from=development /app/dist /srv

@@ -39,7 +39,7 @@ Came up with the following minimal stack:
 cp .env.example .env && cp .env.example .env.dev
 
 make docker-dev-up # for development
-make docker-prod-up # for production
+make docker-prod-up # for production, make sure automigrated db first
 ```
 
 ## Repro Commands (For Reference)
@@ -57,11 +57,11 @@ bun install --lockfile-only
 ### Backend
 
 ```
-mkdir backend
+mkdir backend && cd backend
 go mod init github.com/KennethTrinh/go-vite-app
 ```
 
 ### TODO: (Future)
 
 - JWT Auth/Oauth
-- Metatag support
+- Dynamic Metatag support (WIP)

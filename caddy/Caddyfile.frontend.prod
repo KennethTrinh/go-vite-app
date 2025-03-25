@@ -17,9 +17,23 @@
     encode zstd gzip
 	file_server
 
-    # Add cache-busting headers
-    header *.html Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
-    header /assets/* Cache-Control "public, max-age=31536000, immutable"
+    @cache {
+        path *.css *.js *.html
+    }
+    header @cache Cache-Control "public, max-age=86400, s-maxage=3600, must-revalidate"
+    header /assets/* Cache-Control "public, max-age=31536000, s-maxage=86400, immutable"
+
+    route {
+        metatags {
+            # Home page
+            route "^/$" {
+                title "Go-Vite App | A modern web application template"
+                description "A powerful, production-ready template combining Go backend with Vite frontend for rapid application development."
+                keywords "Go" "Vite" "Web Development" "Full-stack" "Template" "SPA" "API"
+            }
+        }
+    }
+
 	
     # Fallback to index.html for single-page applications (e.g., Vite apps)
     try_files {path} /index.html
