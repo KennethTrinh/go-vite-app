@@ -71,7 +71,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://api.${DOMAIN_NAME}/health", # use the backend endpoint
+          "https://api.${DOMAIN_NAME}/health", # use the backend endpoint
         ]
       interval: 120s
       timeout: 10s
