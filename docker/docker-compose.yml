@@ -61,6 +61,7 @@ services:
       - 443:443
     environment:
       DOMAIN_NAME: ${DOMAIN_NAME}
+    init: true # run minimal init system (such as tini) as PID 1 inside the container. Reaps zombie processes
     volumes:
       - caddy-data:/data
       - caddy-config:/config
